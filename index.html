@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="id" :class="{ 'dark': darkMode }">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Family Tree Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            100: '#1E293B',
+                            200: '#334155',
+                            300: '#475569',
+                            400: '#64748B'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.3/cdn.min.js" defer></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        .tree-node {
+            transition: all 0.3s ease;
+        }
+
+        .tree-line {
+            position: absolute;
+            transition: all 0.3s ease;
+            height: 3px;
+        }
+
+        .dark .tree-line {
+            background-color: #475569;
+            opacity: 0.4;
+        }
+
+        .light .tree-line {
+            background-color: #4F46E5;
+            opacity: 0.3;
+        }
+
+        .tree-container {
+            min-height: 600px;
+            position: relative;
+        }
+
+        .tree-wrapper {
+            transition: transform 0.3s ease;
+        }
+
+        .highlight {
+            animation: highlight 2s ease-in-out;
+        }
+
+        @keyframes highlight {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); background-color: rgba(79, 70, 229, 0.1); }
+        }
+
+        .dark .highlight {
+            @keyframes highlight {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.05); background-color: rgba(79, 70, 229, 0.2); }
+            }
+        }
+
+        @media (max-width: 768px) {
+            .tree-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .tree-node {
+                min-width: 180px;
+            }
+        }
+
+        .loading-spinner {
+            border: 4px solid rgba(79, 70, 229, 0.1);
+            border-left-color: #4F46E5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        .dark .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #ffffff;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-indigo-50 dark:from-gray-900 dark:to-dark-100 min-h-screen transition-colors duration-200" x-data="familyTree()">
+    <!-- Header -->
+    <header class="bg-white/90 dark:bg-dark-100/90 shadow-md sticky top-0 z-50 backdrop-blur-sm transition-colors duration-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+                <div class="flex-1">
+                    <h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent" x-text="config.familyName"></h1>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm" x-text="config.description"></p>
+                </div>
+
+                <!-- Controls -->
+                <div class="flex items-center gap-4">
+                    <!-- Dark Mode Toggle -->
+                    <button 
+                        
+    @click="darkMode = !darkMode; $dispatch('dark-mode-changed')"
+    class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-200 transition-colors"
+    :aria-label="darkMode ? 'Aktifkan Mode Terang' : 'Aktifkan Mode Gelap'"
+>
+                  
+                        <svg x-show="!darkMode" class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                        </svg>
+                        <svg x-show="darkMode" class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        </svg>
+                    </button>
+
+                    <!-- Generation Filter -->
+                    <div class="relative">
+                        <button 
+                            @click="showGenerationFilter = !showGenerationFilter"
+                            class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-200 transition-colors flex items-center gap-2 text-gray-600 dark:text-gray-300"
+                        >
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                            </svg>
+                            <span class="hidden md:inline">Filter Generasi</span>
+                        </button>
+                        
+                        <!-- Filter Dropdown -->
+                        <div 
+                            x-show="showGenerationFilter"
+                            @click.away="showGenerationFilter = false"
+                            x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0 scale-95"
+                            x-transition:enter-end="opacity-100 scale-100"
+                            class="absolute right-0 mt-2 w-48 rounded-lg bg-white dark:bg-dark-100 shadow-lg ring-1 ring-black ring-opacity-5 p-2 space-y-1"
+                        >
+                            <template x-for="(label, index) in config.generationLabels" :key="index">
+                                <div class="flex items-center px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-200 cursor-pointer"
+                                     @click="toggleGeneration(index)">
+                                    <input type="checkbox"
+                                           :checked="selectedGenerations.includes(index)"
+                                           class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500">
+                                    <span class="ml-2 text-gray-700 dark:text-gray-300" x-text="label"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Search Bar -->
+                    <div class="w-full md:w-96 relative">
+                        <div class="relative">
+                            <input 
+                                type="text" 
+                                x-model="searchQuery"
+                                @input.debounce.300ms="searchMembers()"
+                                class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-dark-200 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                                placeholder="Cari anggota keluarga..."
+                            >
+                            <div class="absolute left-3 top-2.5 text-gray-400">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <!-- Search Results -->
+                        <div 
+                            x-show="searchResults.length > 0" 
+                            x-cloak
+                            @click.away="searchResults = []"
+                            class="absolute w-full mt-2 bg-white dark:bg-dark-100 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 max-h-96 overflow-y-auto z-50"
+                        >
+                            <template x-for="result in searchResults" :key="result.id">
+                                <div 
+                                    @click="selectMember(result)"
+                                    class="p-3 hover:bg-indigo-50 dark:hover:bg-dark-200 cursor-pointer border-b last:border-b-0 transition-colors duration-150"
+                                >
+                                    <div class="font-medium dark:text-gray-100" x-text="result.name"></div>
+                                    <div class="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                                        <span x-text="getGenerationLabel(result.generation)"></span>
+                                        <span x-show="result.spouse" class="flex items-center">
+                                            <svg class="w-4 h-4 mx-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                                            </svg>
+                                            <span x-text="result.spouse"></span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+	<!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Tree View -->
+            <div class="lg:col-span-2">
+                <div class="bg-white dark:bg-dark-100 rounded-xl shadow-sm p-4 overflow-hidden transition-colors duration-200">
+                    <div class="tree-container min-w-[800px]" id="treeContainer">
+                        <div x-show="loading" class="loading-overlay flex items-center justify-center p-8">
+                            <div class="loading-spinner"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Controls -->
+                <div class="fixed bottom-4 right-4 flex flex-col space-y-2 z-40">
+                    <button 
+                        @click="zoomIn()"
+                        class="bg-indigo-600 dark:bg-indigo-500 text-white p-2 rounded-full shadow-lg hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
+                        title="Perbesar"
+                    >
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                    </button>
+                    <button 
+                        @click="zoomOut()"
+                        class="bg-indigo-600 dark:bg-indigo-500 text-white p-2 rounded-full shadow-lg hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
+                        title="Perkecil"
+                    >
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                        </svg>
+                    </button>
+                    <button 
+                        @click="resetZoom()"
+                        class="bg-indigo-600 dark:bg-indigo-500 text-white p-2 rounded-full shadow-lg hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
+                        title="Reset Zoom"
+                    >
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Detail Panel -->
+            <div 
+                x-show="selectedMember"
+                x-cloak
+                x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 transform translate-x-4"
+                x-transition:enter-end="opacity-100 transform translate-x-0"
+                class="bg-white dark:bg-dark-100 rounded-xl shadow-sm p-6 lg:sticky lg:top-24 h-fit transition-colors duration-200"
+            >
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent" x-text="selectedMember?.name"></h2>
+                        <p class="text-sm text-gray-500 dark:text-gray-400" x-text="getGenerationLabel(selectedMember?.generation)"></p>
+                    </div>
+                    <button 
+                        @click="selectedMember = null"
+                        class="text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 p-1"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Member Details -->
+                <div class="space-y-6">
+                    <!-- Status Badge -->
+                    <div class="flex items-center space-x-2">
+                        <span 
+                            class="px-3 py-1 rounded-full text-sm"
+                            :class="selectedMember?.deceased ? 
+                                'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300' : 
+                                'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400'"
+                        >
+                            <span x-text="selectedMember?.deceased ? 'Almarhum/ah' : 'Hidup'"></span>
+                        </span>
+                    </div>
+
+                    <!-- Family Info -->
+                    <div class="space-y-4">
+                        <!-- Parents -->
+                        <div x-show="selectedMember?.parents?.length" 
+                             class="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg transition-colors duration-200">
+                            <h3 class="font-medium text-indigo-900 dark:text-indigo-300 mb-2 flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                </svg>
+                                Orang Tua
+                            </h3>
+                            <template x-for="parent in selectedMember?.parents" :key="parent.id">
+                                <div 
+                                    @click="selectMember(parent)"
+                                    class="cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors p-2 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
+                                    x-text="parent.name"
+                                ></div>
+                            </template>
+                        </div>
+
+                        <!-- Spouse -->
+                        <div x-show="selectedMember?.spouse" 
+                             class="p-4 bg-pink-50 dark:bg-pink-900/20 rounded-lg transition-colors duration-200">
+                            <h3 class="font-medium text-pink-900 dark:text-pink-300 mb-2 flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                                </svg>
+                                Pasangan
+                            </h3>
+                            <div class="p-2">
+                                <span x-text="selectedMember?.spouse"></span>
+                                <span x-show="selectedMember?.spouseDeceased" class="text-gray-500 dark:text-gray-400 text-sm">(Alm)</span>
+                            </div>
+                        </div>
+
+                        <!-- Children -->
+                        <div x-show="selectedMember?.children?.length" 
+                             class="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg transition-colors duration-200">
+                            <h3 class="font-medium text-purple-900 dark:text-purple-300 mb-2 flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                </svg>
+                                Anak
+                            </h3>
+                            <div class="space-y-1">
+                                <template x-for="child in selectedMember?.children" :key="child.id">
+                                    <div 
+                                        @click="selectMember(child)"
+                                        class="cursor-pointer hover:text-purple-600 dark:hover:text-purple-400 transition-colors p-2 rounded hover:bg-purple-100 dark:hover:bg-purple-900/40 flex items-center justify-between"
+                                    >
+                                        <span x-text="child.name"></span>
+                                        <svg x-show="child.children?.length" class="w-4 h-4 text-purple-400 dark:text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                        </svg>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Mobile Navigation Drawer -->
+    <div 
+        x-show="selectedMember && window.innerWidth < 768" 
+        x-cloak
+        class="fixed inset-0 z-50"
+        @click.away="selectedMember = null"
+    >
+        <div class="absolute inset-0 bg-black dark:bg-gray-900 opacity-25"></div>
+        <div 
+            class="absolute bottom-0 left-0 right-0 bg-white dark:bg-dark-100 rounded-t-xl p-6 transform transition-transform duration-300"
+            x-transition:enter="translate-y-0"
+            x-transition:enter-start="translate-y-full"
+            x-transition:enter-end="translate-y-0"
+            x-transition:leave="translate-y-full"
+        >
+            <!-- Mobile Detail Content -->
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h2 class="text-xl font-bold dark:text-white" x-text="selectedMember?.name"></h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400" x-text="getGenerationLabel(selectedMember?.generation)"></p>
+                </div>
+                <button 
+                    @click="selectedMember = null"
+                    class="rounded-full p-2 hover:bg-gray-100 dark:hover:bg-dark-200"
+                >
+                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <!-- Mobile Member Details -->
+            <div class="space-y-4 max-h-[70vh] overflow-y-auto">
+                <!-- Status -->
+                <div class="flex items-center space-x-2">
+                    <span 
+                        class="px-3 py-1 rounded-full text-sm"
+                        :class="selectedMember?.deceased ? 
+                            'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300' : 
+                            'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400'"
+                    >
+                        <span x-text="selectedMember?.deceased ? 'Almarhum/ah' : 'Hidup'"></span>
+                    </span>
+                </div>
+
+                <!-- Family Info for Mobile -->
+                <div class="space-y-4">
+                    <template x-if="selectedMember?.parents?.length">
+                        <div class="p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                            <h3 class="font-medium mb-2 dark:text-white">Orang Tua</h3>
+                            <div class="space-y-1">
+                                <template x-for="parent in selectedMember?.parents" :key="parent.id">
+                                    <div 
+                                        @click="selectMember(parent)"
+                                        class="p-2 hover:bg-gray-100 dark:hover:bg-dark-300 rounded cursor-pointer dark:text-gray-300"
+                                        x-text="parent.name"
+                                    ></div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template x-if="selectedMember?.spouse">
+                        <div class="p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                            <h3 class="font-medium mb-2 dark:text-white">Pasangan</h3>
+                            <div class="p-2 dark:text-gray-300">
+                                <span x-text="selectedMember?.spouse"></span>
+                                <span x-show="selectedMember?.spouseDeceased" class="text-gray-500 dark:text-gray-400">(Alm)</span>
+                            </div>
+                        </div>
+                    </template>
+					<template x-if="selectedMember?.children?.length">
+                        <div class="p-3 bg-gray-50 dark:bg-dark-200 rounded-lg">
+                            <h3 class="font-medium mb-2 dark:text-white">Anak</h3>
+                            <div class="space-y-1">
+                                <template x-for="child in selectedMember?.children" :key="child.id">
+                                    <div 
+                                        @click="selectMember(child)"
+                                        class="p-2 hover:bg-gray-100 dark:hover:bg-dark-300 rounded cursor-pointer flex items-center justify-between"
+                                    >
+                                        <span class="dark:text-gray-300" x-text="child.name"></span>
+                                        <svg x-show="child.children?.length" class="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                        </svg>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Config
+        const familyConfig = {
+            familyName: "Keluarga Sejahtera",
+            description: "Silsilah Lengkap Keluarga Besar",
+            additionalFields: [
+                {
+                    id: "birthDate",
+                    label: "Tanggal Lahir",
+                    type: "date"
+                },
+                {
+                    id: "birthPlace",
+                    label: "Tempat Lahir",
+                    type: "text"
+                },
+                {
+                    id: "deathDate",
+                    label: "Tanggal Wafat",
+                    type: "date"
+                }
+            ],
+            generationLabels: [
+                "Generasi Awal",
+                "Anak",
+                "Cucu",
+                "Cicit",
+                "Canggah",
+                "Wareng"
+            ]
+        };
+
+    const completeData = [
+  {
+    "id": "person_1",
+    "name": "Haji Slamet Riyadi",
+    "generation": 0,
+    "deceased": true,
+    "spouse": "Hj. Siti Aminah",
+    "spouseDeceased": true,
+    "parentId": null,
+    "children": [
+      {
+        "id": "person_2",
+        "name": "Ahmad Sukarno",
+        "generation": 1,
+        "deceased": true,
+        "spouse": "Maryati",
+        "spouseDeceased": false,
+        "parentId": "person_1",
+        "children": [
+          {
+            "id": "person_5",
+            "name": "Budi Santoso",
+            "generation": 2,
+            "deceased": false,
+            "spouse": "Dewi Lestari",
+            "spouseDeceased": false,
+            "parentId": "person_2",
+            "children": [
+              {
+                "id": "person_9",
+                "name": "Putri Santoso",
+                "generation": 3,
+                "deceased": false,
+                "spouse": "",
+                "spouseDeceased": false,
+                "parentId": "person_5",
+                "children": []
+              },
+              {
+                "id": "person_10",
+                "name": "Andi Santoso",
+                "generation": 3,
+                "deceased": false,
+                "spouse": "Sari Indah",
+                "spouseDeceased": false,
+                "parentId": "person_5",
+                "children": [
+                  {
+                    "id": "person_13",
+                    "name": "Bayu Santoso",
+                    "generation": 4,
+                    "deceased": false,
+                    "spouse": "",
+                    "spouseDeceased": false,
+                    "parentId": "person_10",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "person_6",
+            "name": "Rina Sukarno",
+            "generation": 2,
+            "deceased": false,
+            "spouse": "Joko Widodo",
+            "spouseDeceased": false,
+            "parentId": "person_2",
+            "children": [
+              {
+                "id": "person_11",
+                "name": "Dinda Widodo",
+                "generation": 3,
+                "deceased": false,
+                "spouse": "Rendi Pratama",
+                "spouseDeceased": false,
+                "parentId": "person_6",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "person_3",
+        "name": "Siti Rahayu",
+        "generation": 1,
+        "deceased": false,
+        "spouse": "Bambang Susilo",
+        "spouseDeceased": true,
+        "parentId": "person_1",
+        "children": [
+          {
+            "id": "person_7",
+            "name": "Agus Susilo",
+            "generation": 2,
+            "deceased": false,
+            "spouse": "Nina Anggraini",
+            "spouseDeceased": false,
+            "parentId": "person_3",
+            "children": [
+              {
+                "id": "person_12",
+                "name": "Dimas Susilo",
+                "generation": 3,
+                "deceased": false,
+                "spouse": "",
+                "spouseDeceased": false,
+                "parentId": "person_7",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "person_4",
+        "name": "Muhammad Yusuf",
+        "generation": 1,
+        "deceased": false,
+        "spouse": "Fatimah Azzahra",
+        "spouseDeceased": false,
+        "parentId": "person_1",
+        "children": [
+          {
+            "id": "person_8",
+            "name": "Anisa Yusuf",
+            "generation": 2,
+            "deceased": false,
+            "spouse": "Rizki Mahendra",
+            "spouseDeceased": false,
+            "parentId": "person_4",
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+];
+        function familyTree() {
+            return {
+                config: familyConfig,
+                familyData: [],
+                searchQuery: '',
+                searchResults: [],
+                selectedMember: null,
+                scale: 1,
+                loading: true,
+                darkMode: false,
+                showGenerationFilter: false,
+                selectedGenerations: [0, 1, 2, 3, 4, 5], // Default semua generasi aktif
+
+             init() {
+    // Check system dark mode preference
+    this.darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    // Load dark mode from localStorage if exists
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode !== null) {
+        this.darkMode = JSON.parse(savedDarkMode);
+    }
+
+    // Watch dark mode changes
+    this.$watch('darkMode', value => {
+        localStorage.setItem('darkMode', JSON.stringify(value));
+        document.documentElement.classList.toggle('dark', value);
+    });
+
+    this.familyData = this.addIdsToData(completeData);
+    this.renderTree();
+    this.initTouchEvents();
+    this.loading = false;
+},
+
+                toggleGeneration(generation) {
+                    const index = this.selectedGenerations.indexOf(generation);
+                    if (index === -1) {
+                        this.selectedGenerations.push(generation);
+                    } else {
+                        this.selectedGenerations.splice(index, 1);
+                    }
+                    this.renderTree();
+                },
+
+                shouldShowMember(member) {
+                    return this.selectedGenerations.includes(member.generation);
+                },
+
+                renderNode(member, parent, level) {
+                    if (!this.shouldShowMember(member)) return;
+
+                    const node = document.createElement('div');
+                   node.className = `tree-node relative p-4 
+    ${this.darkMode ? 'bg-dark-200 text-white' : 'bg-white'} 
+    rounded-lg shadow-sm border dark:border-gray-700
+    hover:shadow-md transition-shadow mb-8 mx-2
+    ${member.deceased ? this.darkMode ? 'bg-dark-300' : 'bg-gray-50' : ''}
+    ${this.selectedMember?.id === member.id ? 'ring-2 ring-indigo-500' : ''}`;
+                    node.setAttribute('data-id', member.id);
+
+                    node.innerHTML = `
+                        <div class="flex items-center space-x-3">
+                            <div>
+                                <div class="font-medium">${member.name}</div>
+                                <div class="text-sm ${this.darkMode ? 'text-gray-400' : 'text-gray-500'}">
+                                    ${this.getGenerationLabel(member.generation)}
+                                    ${member.deceased ? ' (Alm)' : ''}
+                                </div>
+                                ${member.spouse ? `
+                                    <div class="text-sm ${this.darkMode ? 'text-gray-400' : 'text-gray-500'}">
+                                        Pasangan: ${member.spouse}
+                                        ${member.spouseDeceased ? ' (Alm)' : ''}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+
+                    node.addEventListener('click', () => {
+                        this.selectMember(member);
+                    });
+
+                    const nodeContainer = document.createElement('div');
+                    nodeContainer.className = 'flex flex-col items-center';
+                    nodeContainer.appendChild(node);
+
+                    if (member.children && member.children.length > 0) {
+                        const childrenContainer = document.createElement('div');
+                        childrenContainer.className = 'flex justify-center space-x-4';
+                        member.children.forEach(child => {
+                            if (this.shouldShowMember(child)) {
+                                this.renderNode(child, childrenContainer, level + 1);
+                            }
+                        });
+                        if (childrenContainer.children.length > 0) {
+                            nodeContainer.appendChild(childrenContainer);
+                        }
+                    }
+
+                    parent.appendChild(nodeContainer);
+                },
+
+                addIdsToData(data) {
+            return data.map(node => {
+                const newNode = { ...node, id: Math.random().toString(36).substr(2, 9) };
+                if (newNode.children) {
+                    newNode.children = this.addIdsToData(newNode.children);
+                }
+                return newNode;
+            });
+        },
+
+        searchMembers() {
+            if (!this.searchQuery.trim()) {
+                this.searchResults = [];
+                return;
+            }
+            const query = this.searchQuery.toLowerCase();
+            this.searchResults = this.flattenFamilyTree(this.familyData).filter(member => {
+                return member.name.toLowerCase().includes(query) ||
+                       member.spouse?.toLowerCase().includes(query);
+            });
+        },
+
+        flattenFamilyTree(data) {
+            let result = [];
+            function traverse(members, parentInfo = null) {
+                members.forEach(member => {
+                    if (parentInfo) {
+                        member.parents = [parentInfo];
+                    }
+                    result.push(member);
+                    if (member.children && member.children.length > 0) {
+                        traverse(member.children, {
+                            id: member.id,
+                            name: member.name,
+                            generation: member.generation
+                        });
+                    }
+                });
+            }
+            traverse(Array.isArray(data) ? data : [data]);
+            return result;
+        },
+
+        renderTree() {
+            const container = document.getElementById('treeContainer');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            const treeWrapper = document.createElement('div');
+            treeWrapper.className = 'tree-wrapper relative';
+            treeWrapper.style.transform = `scale(${this.scale})`;
+            treeWrapper.style.transformOrigin = 'center top';
+
+            this.familyData.forEach(member => {
+                this.renderNode(member, treeWrapper, 0);
+            });
+
+            container.appendChild(treeWrapper);
+            this.drawConnections();
+        },
+
+        drawConnections() {
+            const lines = document.querySelectorAll('.tree-line');
+            lines.forEach(line => line.remove());
+
+            const nodes = document.querySelectorAll('.tree-node');
+            nodes.forEach(node => {
+                const parentRect = node.getBoundingClientRect();
+                const childrenContainer = node.parentElement.querySelector(':scope > div > .flex');
+                
+                if (childrenContainer) {
+                    const children = childrenContainer.querySelectorAll(':scope > div > .tree-node');
+                    children.forEach(child => {
+                        const childRect = child.getBoundingClientRect();
+                        this.drawLine(
+                            parentRect.left + parentRect.width / 2,
+                            parentRect.bottom,
+                            childRect.left + childRect.width / 2,
+                            childRect.top
+                        );
+                    });
+                }
+            });
+        },
+
+        drawLine(x1, y1, x2, y2) {
+            const line = document.createElement('div');
+            line.className = 'tree-line absolute';
+            
+            const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+            const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+            
+            line.style.width = `${length}px`;
+            line.style.height = '2px';
+            line.style.left = `${x1}px`;
+            line.style.top = `${y1}px`;
+            line.style.transform = `rotate(${angle}deg)`;
+            line.style.transformOrigin = '0 0';
+            
+            document.getElementById('treeContainer').appendChild(line);
+        },
+
+        selectMember(member) {
+            this.selectedMember = member;
+            const memberNode = document.querySelector(`[data-id="${member.id}"]`);
+            if (memberNode) {
+                memberNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                memberNode.classList.add('highlight');
+                setTimeout(() => memberNode.classList.remove('highlight'), 2000);
+            }
+        },
+
+        getGenerationLabel(generation) {
+            return this.config.generationLabels[generation] || `Generasi ${generation}`;
+        },
+
+        zoomIn() {
+            this.scale = Math.min(this.scale * 1.2, 2);
+            this.renderTree();
+        },
+
+        zoomOut() {
+            this.scale = Math.max(this.scale * 0.8, 0.5);
+            this.renderTree();
+        },
+
+        resetZoom() {
+            this.scale = 1;
+            this.renderTree();
+        },
+
+  initTouchEvents() {
+            const container = document.getElementById('treeContainer');
+            let touchStartX = 0;
+            let touchStartY = 0;
+
+            container.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            });
+
+            container.addEventListener('touchmove', (e) => {
+                if (!touchStartX || !touchStartY) return;
+
+                const xDiff = touchStartX - e.touches[0].clientX;
+                const yDiff = touchStartY - e.touches[0].clientY;
+
+                container.scrollLeft += xDiff;
+                container.scrollTop += yDiff;
+
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            });
+        }
+    } // Tutup return
+} // Tutup function familyTree
+
+// Event listener di luar function familyTree
+window.addEventListener('resize', () => {
+    const container = document.getElementById('treeContainer');
+    if (container) {
+        clearTimeout(window.resizeTimer);
+        window.resizeTimer = setTimeout(() => {
+            const app = document.querySelector('[x-data="familyTree()"]').__x.$data;
+            app.renderTree();
+        }, 250);
+    }
+}); 
+    </script>
+</body>
+</html>
