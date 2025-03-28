@@ -1,6 +1,6 @@
 # Silsilah Visual
 
-![Banner Silsilah Visual](https://via.placeholder.com/800x200?text=Silsilah+Visual)
+![Banner Silsilah Visual](https://blog.classy.id/upload/gambar_berita/7aa89c4911e236012826a4dcc4b717f5_20250328112829.png)
 
 ## 📋 Deskripsi
 
@@ -52,8 +52,8 @@ Lihat [TUTORIAL.md](./TUTORIAL.md) untuk petunjuk langkah-demi-langkah yang lebi
 
 ## 📱 Tampilan Aplikasi
 
-![Tampilan Desktop](https://via.placeholder.com/800x450?text=Tampilan+Desktop)
-![Tampilan Mobile](https://via.placeholder.com/400x700?text=Tampilan+Mobile)
+![Tampilan Desktop](https://blog.classy.id/upload/gambar_berita/7aa89c4911e236012826a4dcc4b717f5_20250328112829.png)
+![Tampilan Mobile](https://blog.classy.id/upload/gambar_berita/8fabde3d32a1586cd75649da640fed69_20250328113615.jpg)
 
 ## 🛠️ Teknologi yang Digunakan
 
