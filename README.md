@@ -24,7 +24,7 @@ Silsilah Visual dirancang sebagai pasangan sempurna untuk aplikasi [Keluarga Vis
 
 ### Menggunakan Versi Online
 
-Kunjungi [Website ini](https://silsilah-visual.vercel.app) untuk menggunakan aplikasi tanpa perlu menginstal apapun.
+Kunjungi [Website ini](https://classyid.github.io/silsilah-visual/index.html) untuk menggunakan aplikasi tanpa perlu menginstal apapun.
 
 ### Menjalankan Secara Lokal
 
